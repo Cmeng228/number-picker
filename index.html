@@ -194,7 +194,7 @@
 
     .actions {
       display: grid;
-      grid-template-columns: 1fr 1fr 140px;
+      grid-template-columns: 1fr 1fr 1fr 140px;
       gap: 10px;
     }
 
@@ -366,6 +366,7 @@
 
     <section class="actions">
       <button class="primary" id="pickThree">随机选 3 个</button>
+      <button class="primary" id="pickFour">随机选 4 个</button>
       <button class="secondary" id="pickSide">随机上/下</button>
       <button class="reset" id="reset">全部恢复</button>
     </section>
@@ -411,7 +412,8 @@
       board.appendChild(button);
     });
 
-    document.getElementById("pickThree").addEventListener("click", pickThree);
+    document.getElementById("pickThree").addEventListener("click", () => pickNumbers(3));
+    document.getElementById("pickFour").addEventListener("click", () => pickNumbers(4));
     document.getElementById("pickSide").addEventListener("click", pickSide);
     document.getElementById("reset").addEventListener("click", resetAll);
     disableMode.addEventListener("click", () => setMode("disable"));
@@ -456,10 +458,10 @@
       render();
     }
 
-    function pickThree() {
+    function pickNumbers(drawCount) {
       const available = numbers.filter((number) => !disabled.has(number));
-      if (available.length < 3) {
-        warn.textContent = "剩余数字少于 3 个，先恢复一些数字。";
+      if (available.length < drawCount) {
+        warn.textContent = `剩余数字少于 ${drawCount} 个，先恢复一些数字。`;
         latest = [];
         markedPinned = null;
         render();
@@ -475,10 +477,10 @@
       }
       if (activePinned.length > 0) {
         const mustHave = shuffle(activePinned)[0];
-        const rest = shuffle(available.filter((number) => number !== mustHave)).slice(0, 2);
+        const rest = shuffle(available.filter((number) => number !== mustHave)).slice(0, drawCount - 1);
         latest = [mustHave, ...rest].sort((a, b) => a - b);
       } else {
-        latest = shuffle(available).slice(0, 3).sort((a, b) => a - b);
+        latest = shuffle(available).slice(0, drawCount).sort((a, b) => a - b);
       }
       const markedOptions = latest.filter((number) => pinned.has(number) && !disabled.has(number));
       markedPinned = markedOptions.length ? shuffle(markedOptions)[0] : null;
