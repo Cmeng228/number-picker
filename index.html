@@ -78,6 +78,7 @@
     }
 
     .num {
+      position: relative;
       height: 74px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -104,6 +105,70 @@
       background: #dbf3ea;
       border-color: var(--primary);
       color: var(--primary-dark);
+    }
+
+    .num.pinned {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 2px rgba(216, 88, 63, 0.35);
+    }
+
+    .num.pinned::after {
+      content: "指";
+      position: absolute;
+      right: 7px;
+      top: 7px;
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      text-decoration: none;
+    }
+
+    .num.off.pinned::after {
+      background: var(--disabled);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .mode-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      max-width: 320px;
+    }
+
+    .mode {
+      height: 40px;
+      border: 1px solid var(--line);
+      background: #eef2f6;
+      color: #2b3646;
+    }
+
+    .mode.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+      text-align: right;
     }
 
     .actions {
@@ -217,6 +282,18 @@
         grid-template-columns: repeat(4, minmax(0, 1fr));
       }
 
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .mode-toggle {
+        max-width: none;
+      }
+
+      .hint {
+        text-align: left;
+      }
+
       .actions {
         grid-template-columns: 1fr;
       }
@@ -232,6 +309,14 @@
       </div>
       <div class="count" id="count">可选 12 个</div>
     </header>
+
+    <section class="toolbar">
+      <div class="mode-toggle" aria-label="操作模式">
+        <button class="mode active" id="disableMode" type="button">取消数字</button>
+        <button class="mode" id="pinMode" type="button">指定数字</button>
+      </div>
+      <div class="hint" id="hint">指定 0/4 个</div>
+    </section>
 
     <section class="board" id="board" aria-label="数字选择区"></section>
 
@@ -258,13 +343,18 @@
   <script>
     const numbers = Array.from({ length: 12 }, (_, index) => index + 1);
     const disabled = new Set();
+    const pinned = new Set();
     let latest = [];
+    let mode = "disable";
 
     const board = document.getElementById("board");
     const count = document.getElementById("count");
+    const hint = document.getElementById("hint");
     const picked = document.getElementById("picked");
     const side = document.getElementById("side");
     const warn = document.getElementById("warn");
+    const disableMode = document.getElementById("disableMode");
+    const pinMode = document.getElementById("pinMode");
 
     numbers.forEach((number) => {
       const button = document.createElement("button");
@@ -279,14 +369,39 @@
     document.getElementById("pickThree").addEventListener("click", pickThree);
     document.getElementById("pickSide").addEventListener("click", pickSide);
     document.getElementById("reset").addEventListener("click", resetAll);
+    disableMode.addEventListener("click", () => setMode("disable"));
+    pinMode.addEventListener("click", () => setMode("pin"));
 
     function toggleNumber(number) {
+      if (mode === "pin") {
+        togglePinned(number);
+        return;
+      }
       if (disabled.has(number)) {
         disabled.delete(number);
       } else {
         disabled.add(number);
       }
       latest = latest.filter((item) => item !== number);
+      render();
+    }
+
+    function togglePinned(number) {
+      if (pinned.has(number)) {
+        pinned.delete(number);
+      } else if (pinned.size >= 4) {
+        warn.textContent = "最多只能指定 4 个数字。";
+        return;
+      } else {
+        pinned.add(number);
+      }
+      warn.textContent = "";
+      render();
+    }
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      warn.textContent = "";
       render();
     }
 
@@ -298,7 +413,20 @@
         render();
         return;
       }
-      latest = shuffle(available).slice(0, 3).sort((a, b) => a - b);
+      const activePinned = numbers.filter((number) => pinned.has(number) && !disabled.has(number));
+      if (pinned.size > 0 && activePinned.length === 0) {
+        warn.textContent = "指定数字都已被取消，先恢复至少 1 个指定数字。";
+        latest = [];
+        render();
+        return;
+      }
+      if (activePinned.length > 0) {
+        const mustHave = shuffle(activePinned)[0];
+        const rest = shuffle(available.filter((number) => number !== mustHave)).slice(0, 2);
+        latest = [mustHave, ...rest].sort((a, b) => a - b);
+      } else {
+        latest = shuffle(available).slice(0, 3).sort((a, b) => a - b);
+      }
       warn.textContent = "";
       render();
     }
@@ -310,6 +438,7 @@
 
     function resetAll() {
       disabled.clear();
+      pinned.clear();
       latest = [];
       side.textContent = "-";
       warn.textContent = "";
@@ -330,8 +459,13 @@
         const number = Number(button.dataset.number);
         button.classList.toggle("off", disabled.has(number));
         button.classList.toggle("hit", latest.includes(number));
+        button.classList.toggle("pinned", pinned.has(number));
       });
-      count.textContent = `可选 ${12 - disabled.size} 个`;
+      disableMode.classList.toggle("active", mode === "disable");
+      pinMode.classList.toggle("active", mode === "pin");
+      count.textContent = `可选 ${12 - disabled.size} 个｜指定 ${pinned.size} 个`;
+      const activePinned = numbers.filter((number) => pinned.has(number) && !disabled.has(number));
+      hint.textContent = `有效指定 ${activePinned.length}/${pinned.size} 个，最多指定 4 个`;
       picked.innerHTML = "";
       latest.forEach((number) => {
         const item = document.createElement("div");
