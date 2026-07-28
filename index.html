@@ -133,6 +133,27 @@
       background: var(--disabled);
     }
 
+    .num.marked {
+      border-color: #a63e2c;
+      box-shadow: inset 0 0 0 3px rgba(216, 88, 63, 0.55);
+    }
+
+    .num.marked::before {
+      content: "特";
+      position: absolute;
+      left: 7px;
+      top: 7px;
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #a63e2c;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
     .toolbar {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -234,6 +255,7 @@
     }
 
     .pill {
+      position: relative;
       width: 58px;
       height: 58px;
       display: grid;
@@ -242,6 +264,28 @@
       background: var(--primary);
       color: #fff;
       font-size: 26px;
+      font-weight: 900;
+    }
+
+    .pill.marked {
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(216, 88, 63, 0.18);
+    }
+
+    .pill.marked::after {
+      content: "特";
+      position: absolute;
+      right: -7px;
+      top: -7px;
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #ffffff;
+      color: var(--accent);
+      border: 2px solid var(--accent);
+      font-size: 13px;
       font-weight: 900;
     }
 
@@ -345,6 +389,7 @@
     const disabled = new Set();
     const pinned = new Set();
     let latest = [];
+    let markedPinned = null;
     let mode = "disable";
 
     const board = document.getElementById("board");
@@ -383,12 +428,18 @@
         disabled.add(number);
       }
       latest = latest.filter((item) => item !== number);
+      if (!latest.includes(markedPinned)) {
+        markedPinned = null;
+      }
       render();
     }
 
     function togglePinned(number) {
       if (pinned.has(number)) {
         pinned.delete(number);
+        if (markedPinned === number) {
+          markedPinned = null;
+        }
       } else if (pinned.size >= 4) {
         warn.textContent = "最多只能指定 4 个数字。";
         return;
@@ -410,6 +461,7 @@
       if (available.length < 3) {
         warn.textContent = "剩余数字少于 3 个，先恢复一些数字。";
         latest = [];
+        markedPinned = null;
         render();
         return;
       }
@@ -417,6 +469,7 @@
       if (pinned.size > 0 && activePinned.length === 0) {
         warn.textContent = "指定数字都已被取消，先恢复至少 1 个指定数字。";
         latest = [];
+        markedPinned = null;
         render();
         return;
       }
@@ -427,6 +480,8 @@
       } else {
         latest = shuffle(available).slice(0, 3).sort((a, b) => a - b);
       }
+      const markedOptions = latest.filter((number) => pinned.has(number) && !disabled.has(number));
+      markedPinned = markedOptions.length ? shuffle(markedOptions)[0] : null;
       warn.textContent = "";
       render();
     }
@@ -440,6 +495,7 @@
       disabled.clear();
       pinned.clear();
       latest = [];
+      markedPinned = null;
       side.textContent = "-";
       warn.textContent = "";
       render();
@@ -460,6 +516,7 @@
         button.classList.toggle("off", disabled.has(number));
         button.classList.toggle("hit", latest.includes(number));
         button.classList.toggle("pinned", pinned.has(number));
+        button.classList.toggle("marked", markedPinned === number);
       });
       disableMode.classList.toggle("active", mode === "disable");
       pinMode.classList.toggle("active", mode === "pin");
@@ -470,6 +527,7 @@
       latest.forEach((number) => {
         const item = document.createElement("div");
         item.className = "pill";
+        item.classList.toggle("marked", markedPinned === number);
         item.textContent = number;
         picked.appendChild(item);
       });
